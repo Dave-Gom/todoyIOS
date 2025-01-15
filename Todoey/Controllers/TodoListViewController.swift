@@ -8,10 +8,16 @@
 
 import UIKit
 import RealmSwift
+import ChameleonFramework
 
-class TodoListViewController: UITableViewController{
+class TodoListViewController: SwipeTableViewController{
     
     let realm = try! Realm()
+    
+    @IBOutlet weak var searchBar: UISearchBar!
+    
+    
+    
     
     var selectedCategory: Category? {
         didSet {
@@ -27,6 +33,48 @@ class TodoListViewController: UITableViewController{
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        
+        tableView.separatorStyle = .none
+        
+        tableView.rowHeight = 80.0
+        
+        
+
+    }
+    
+    override func viewWillAppear(_ animated: Bool) {
+        
+
+        
+        if let colorHex = selectedCategory?.color{
+            
+            title = selectedCategory!.name 
+            guard let navBar = navigationController?.navigationBar else {fatalError("No existe el navigationController")}
+            
+            
+            if let navBarColor = UIColor(hexString: colorHex){
+                searchBar.barTintColor = navBarColor
+                searchBar.searchTextField.textColor = ContrastColorOf(navBarColor, returnFlat: true)
+                searchBar.inputView?.layer.borderColor = navBarColor.cgColor
+
+                let standardAppearance = UINavigationBarAppearance()
+                
+                standardAppearance.configureWithOpaqueBackground()
+                standardAppearance.largeTitleTextAttributes = [NSAttributedString.Key.foregroundColor: ContrastColorOf(navBarColor, returnFlat: true)]
+                standardAppearance.backgroundColor = navBarColor
+
+                standardAppearance.titleTextAttributes = [NSAttributedString.Key.foregroundColor: ContrastColorOf(navBarColor, returnFlat: true)]
+                
+                navBar.standardAppearance = standardAppearance
+                navBar.scrollEdgeAppearance = standardAppearance
+
+                navBar.tintColor = ContrastColorOf(navBarColor, returnFlat: true)
+
+            }
+            
+            
+        }
+        
     }
     
     //MARK -  Metodos del datasource del TableView
@@ -36,16 +84,20 @@ class TodoListViewController: UITableViewController{
     }
     
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "TodoItemCell", for: indexPath)
-        
+        let cell = super.tableView(tableView, cellForRowAt: indexPath)
         
         if let item = todoItems?[indexPath.row]{
-            cell.textLabel?.text = todoItems?[indexPath.row].title;
+            cell.textLabel?.text = item.title;
             cell.accessoryType = item.done ? .checkmark : .none
+            
+            if let color = UIColor(hexString: selectedCategory!.color)?.darken(byPercentage: CGFloat(indexPath.row)/CGFloat(self.todoItems?.count ?? 1)){
+                cell.backgroundColor = color
+            }
+           
+            
+            cell.textLabel?.textColor = ContrastColorOf(cell.backgroundColor!, returnFlat: true)
 
         }
-        
-        
         
         return cell;
     }
@@ -118,17 +170,26 @@ class TodoListViewController: UITableViewController{
     //MARK - Load Items
     func loadItems(){
         
-        do{
-            
-            todoItems = selectedCategory?.items.sorted(byKeyPath: "title", ascending: true)
-            tableView.reloadData()
-        }
-        catch{
-            print("error en la carga")
-            print("error loading \(error)")
-        }
+        todoItems = selectedCategory?.items.sorted(byKeyPath: "title", ascending: true)
+        tableView.reloadData()
         
     }
+    
+    //MARK: - Delete
+    
+    override func updateModel(at indexPath: IndexPath) {
+        do{
+            if let item = self.todoItems?[indexPath.row] {
+                try self.realm.write {
+                    self.realm.delete(item)
+                }
+            }
+        }
+        catch {
+            print("error al eliminar \(error)")
+        }
+    }
+    
 
 }
 
@@ -154,7 +215,5 @@ extension TodoListViewController: UISearchBarDelegate {
             }
         }
     }
-    
-    
     
 }
